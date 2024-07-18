@@ -66,6 +66,9 @@ dumps = function(x, indent, order)
           outtemp = outtemp .. " " .. item_lines[i]
         end
       end
+      outtemp = outtemp:sub(1, -2)
+      outtemp = outtemp:gsub(",", "")
+      table.insert(out, outtemp)
     else
       -- Gather and sort keys so we can keep the order deterministic.
       local keys = {}
