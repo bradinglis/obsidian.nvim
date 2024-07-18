@@ -472,7 +472,11 @@ Picker._make_display = function(self, entry)
       end
     end
 
-    display = display .. tostring(self.client:vault_relative_path(entry.filename, { strict = true }))
+    if entry.display ~= nil then
+      display = display .. entry.display
+    else
+      display = display .. tostring(self.client:vault_relative_path(entry.filename, { strict = true }))
+    end
 
     if entry.lnum ~= nil then
       display = display .. ":" .. entry.lnum
@@ -480,10 +484,6 @@ Picker._make_display = function(self, entry)
       if entry.col ~= nil then
         display = display .. ":" .. entry.col
       end
-    end
-
-    if entry.display ~= nil then
-      display = display .. ":" .. entry.display
     end
   elseif entry.display ~= nil then
     if entry.icon ~= nil then
