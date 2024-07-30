@@ -875,6 +875,15 @@ Client.follow_link_async = function(self, link, opts)
         return self:open_note(res.note, { line = res.line, col = res.col, open_strategy = opts.open_strategy })
       end
 
+      if util.is_img(res.location) then
+        if self.opts.follow_img_func ~= nil then
+          self.opts.follow_img_func(res.location)
+        else
+          log.warn "This looks like an image path. You can customize the behavior of images with the 'follow_img_func' option."
+        end
+        return
+      end
+
       if res.link_type == search.RefTypes.Wiki or res.link_type == search.RefTypes.WikiWithAlias then
         -- Prompt to create a new note.
         if util.confirm("Create new note '" .. res.location .. "'?") then
@@ -1301,7 +1310,8 @@ Client.find_backlinks_async = function(self, note, callback, opts)
 
   -- Prepare search terms.
   local search_terms = {}
-  for raw_ref in iter { tostring(note.id), note:fname(), self:vault_relative_path(note.path) } do
+  local note_path = Path.new(note.path)
+  for raw_ref in iter { tostring(note.id), note_path.name, note_path.stem, self:vault_relative_path(note.path) } do
     for ref in
       iter(util.tbl_unique {
         raw_ref,

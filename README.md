@@ -349,13 +349,6 @@ This is a complete list of all of the options that can be passed to `require("ob
   -- Either 'wiki' or 'markdown'.
   preferred_link_style = "wiki",
 
-  -- Optional, customize the default name or prefix when pasting images via `:ObsidianPasteImg`.
-  ---@return string
-  image_name_func = function()
-    -- Prefix image names with timestamp.
-    return string.format("%s-", os.time())
-  end,
-
   -- Optional, boolean or a function that takes a filename and returns a boolean.
   -- `true` indicates that you don't want obsidian.nvim to manage frontmatter.
   disable_frontmatter = false,
@@ -397,6 +390,16 @@ This is a complete list of all of the options that can be passed to `require("ob
     -- Open the URL in the default web browser.
     vim.fn.jobstart({"open", url})  -- Mac OS
     -- vim.fn.jobstart({"xdg-open", url})  -- linux
+    -- vim.cmd(':silent exec "!start ' .. url .. '"') -- Windows
+  end,
+
+  -- Optional, by default when you use `:ObsidianFollowLink` on a link to an image
+  -- file it will be ignored but you can customize this behavior here.
+  ---@param img string
+  follow_url_func = function(img)
+    vim.fn.jobstart { "qlmanage", "-p", img }  -- Mac OS quick look preview
+    -- vim.fn.jobstart({"xdg-open", url})  -- linux
+    -- vim.cmd(':silent exec "!start ' .. url .. '"') -- Windows
   end,
 
   -- Optional, set to true if you use the Obsidian Advanced URI plugin.
@@ -411,11 +414,17 @@ This is a complete list of all of the options that can be passed to `require("ob
     name = "telescope.nvim",
     -- Optional, configure key mappings for the picker. These are the defaults.
     -- Not all pickers support all mappings.
-    mappings = {
+    note_mappings = {
       -- Create a new note from your query.
       new = "<C-x>",
       -- Insert a link to the selected note.
       insert_link = "<C-l>",
+    },
+    tag_mappings = {
+      -- Add tag(s) to current note.
+      tag_note = "<C-x>",
+      -- Insert a tag at the current location.
+      insert_tag = "<C-l>",
     },
   },
 
@@ -512,6 +521,14 @@ This is a complete list of all of the options that can be passed to `require("ob
     -- If this is a relative path it will be interpreted as relative to the vault root.
     -- You can always override this per image by passing a full path to the command instead of just a filename.
     img_folder = "assets/imgs",  -- This is the default
+
+    -- Optional, customize the default name or prefix when pasting images via `:ObsidianPasteImg`.
+    ---@return string
+    img_name_func = function()
+      -- Prefix image names with timestamp.
+      return string.format("%s-", os.time())
+    end,
+
     -- A function that determines the text to insert in the note when pasting an image.
     -- It takes two arguments, the `obsidian.Client` and an `obsidian.Path` to the image file.
     -- This is the default implementation.

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Added `opts.follow_img_func` option for customizing how to handle image paths.
+- Added better handling for undefined template fields, which will now be prompted for.
+
+### Changed
+
+- Renamed `opts.image_name_func` to `opts.attachments.img_name_func`.
+
+### Fixed
+
+- Fixed an edge case with collecting backlinks.
+- Fixed typo in `ObsidianPasteImg`'s command description
+
 ## [v3.9.0](https://github.com/epwalsh/obsidian.nvim/releases/tag/v3.9.0) - 2024-07-11
 
 ### Added
