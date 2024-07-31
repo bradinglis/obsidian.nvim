@@ -1076,18 +1076,27 @@ util.open_buffer = function(path, opts)
   ---@type integer|?
   local result_bufnr
 
+  -- Makes for cleaner names in barbar for Windows, don't see any downsides as its merely for buffer management
+  if util.get_os() == util.OSType.Windows then
+      path_str = tostring(path):gsub("/", "\\")
+  else
+      path_str = tostring(path)
+  end
+
   -- Check for buffer in windows and use 'drop' command if one is found.
   for _, winnr in ipairs(vim.api.nvim_list_wins()) do
     local bufnr = vim.api.nvim_win_get_buf(winnr)
     local bufname = vim.api.nvim_buf_get_name(bufnr)
-    if bufname == tostring(path) then
+    if bufname == path_str then
       cmd = "drop"
       result_bufnr = bufnr
       break
     end
   end
 
-  vim.cmd(string.format("%s %s", cmd, vim.fn.fnameescape(tostring(path))))
+
+  vim.cmd(string.format("%s %s", cmd, vim.fn.fnameescape(path_str)))
+
   if opts.line then
     vim.api.nvim_win_set_cursor(0, { tonumber(opts.line), opts.col and opts.col or 0 })
   end
