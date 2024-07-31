@@ -768,7 +768,8 @@ Client.resolve_link_async = function(self, link, callback)
   end
 
   -- The Obsidian app will follow URL-encoded links, so we should to.
-  location = util.urldecode(location)
+  -- ACTUALLY NO THANKS, I WANT % PREFIXES AND URL HEX ENCODING DOESN'T WORK WITH IT
+  -- location = util.urldecode(location)
 
   -- Remove block links from the end if there are any.
   -- TODO: handle block links.
@@ -910,7 +911,7 @@ Client.follow_link_async = function(self, link, opts)
         end
       end
 
-      return log.err("Failed to resolve file '" .. res.location .. "'")
+      return log.err("Failed to resolve file '%s'", res.location)
     end
 
     if #results == 1 then
