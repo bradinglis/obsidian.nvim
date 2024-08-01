@@ -907,10 +907,11 @@ util.get_visual_selection = function(opts)
     -- if we are in visual mode use the live position
     _, csrow, cscol, _ = unpack(vim.fn.getpos ".")
     _, cerow, cecol, _ = unpack(vim.fn.getpos "v")
-    if mode == "V" then
-      -- visual line doesn't provide columns
-      cscol, cecol = 0, 999
-    end
+    -- Made superfluous
+    -- if mode == "V" then
+    --   -- visual line doesn't provide columns
+    --   cscol, cecol = 0, 999
+    -- end
     -- exit visual mode
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
   else
@@ -923,8 +924,12 @@ util.get_visual_selection = function(opts)
   if cerow < csrow then
     csrow, cerow = cerow, csrow
     cscol, cecol = cecol, cscol
-  elseif cerow == csrow and cecol < cscol then
+  elseif mode ~= "V" and cerow == csrow and cecol < cscol then
     cscol, cecol = cecol, cscol
+  end
+
+  if mode == "V" then
+      cscol, cecol = 1, -1
   end
 
   local lines = vim.fn.getline(csrow, cerow)

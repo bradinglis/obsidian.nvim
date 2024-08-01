@@ -671,10 +671,11 @@ Note.frontmatter_lines = function(self, eol, frontmatter)
   end
 
   table.insert(new_lines, "---")
-  if not self.has_frontmatter then
-    -- Make sure there's an empty line between end of the frontmatter and the contents.
-    table.insert(new_lines, "")
-  end
+
+  -- if not self.has_frontmatter then
+  --   -- Make sure there's an empty line between end of the frontmatter and the contents.
+  --   table.insert(new_lines, "")
+  -- end
 
   if eol then
     return vim.tbl_map(function(l)
