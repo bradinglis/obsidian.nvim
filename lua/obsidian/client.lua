@@ -467,7 +467,7 @@ Client.find_notes_async = function(self, term, callback, opts)
     opts.notes.max_lines = self.opts.search_max_lines
   end
 
-  local next_path = self:_search_iter_async(term, opts.search)
+  local next_path = self:_search_iter_async(term, opts.search, opts.search)
   local executor = AsyncExecutor.new()
 
   ---@type table<string, integer>
