@@ -510,10 +510,10 @@ Client.find_notes_async = function(self, term, callback, opts)
         end
       end
 
-      -- Then sort by original order.
-      table.sort(results_, function(a, b)
-        return paths[tostring(a.path)] < paths[tostring(b.path)]
-      end)
+      -- -- Then sort by original order.
+      -- table.sort(results_, function(a, b)
+      --   return paths[tostring(a.path)] < paths[tostring(b.path)]
+      -- end)
 
       -- Check for datetime macros.
       if string.len(term) > 0 then
