@@ -561,10 +561,10 @@ local _search_async = function(term, search_opts, find_opts, callback, exit_call
   end
 
   local function on_exit()
-    cmds_done = cmds_done + 1
-    if cmds_done == 2 then
-      exit_callback(result)
-    end
+    -- cmds_done = cmds_done + 1
+    -- if cmds_done == 2 then
+    exit_callback(result)
+    -- end
   end
 
   M.search_async(
@@ -575,7 +575,7 @@ local _search_async = function(term, search_opts, find_opts, callback, exit_call
     on_exit
   )
 
-  M.find_async(Obsidian.dir, term, _prepare_search_opts(find_opts, { ignore_case = true }), on_find_match, on_exit)
+  -- M.find_async(Obsidian.dir, term, _prepare_search_opts(find_opts, { ignore_case = true }), on_find_match, on_exit)
 end
 
 --- An async version of `find_notes()` using coroutines.
@@ -595,7 +595,6 @@ M.find_notes_async = function(term, callback, opts)
 
     ---@type table<string, integer>
     local paths = {}
-    local num_results = 0
     local err_count = 0
     local first_err, first_err_path
     local notes = {}
@@ -605,8 +604,6 @@ M.find_notes_async = function(term, callback, opts)
     local function load_note_async(path)
       local ok, res = pcall(Note.from_file, path, opts.notes)
       if ok then
-        num_results = num_results + 1
-        paths[tostring(path)] = num_results
         notes[#notes + 1] = res
       else
         err_count = err_count + 1
@@ -619,6 +616,7 @@ M.find_notes_async = function(term, callback, opts)
 
     local paths_found = {} ---@type string[]
     async.await(5, _search_async, term, opts.search, nil, function(path)
+      paths[tostring(path)] = #paths_found + 1
       paths_found[#paths_found + 1] = path
     end)
 
