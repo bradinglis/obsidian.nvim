@@ -57,13 +57,17 @@ dumps = function(x, indent, order)
     local out = {}
 
     if util.islist(x) then
+      local outtemp = ""
       for _, v in ipairs(x) do
         local item_lines = dumps(v, indent + 2)
-        table.insert(out, indent_str .. "- " .. util.lstrip_whitespace(item_lines[1]))
+        outtemp = outtemp .. util.lstrip_whitespace(item_lines[1]) .. " "
         for i = 2, #item_lines do
-          table.insert(out, item_lines[i])
+          outtemp = outtemp .. " " .. item_lines[i]
         end
       end
+      outtemp = outtemp:sub(1, -2)
+      outtemp = outtemp:gsub(",", "")
+      table.insert(out, outtemp)
     else
       -- Gather and sort keys so we can keep the order deterministic.
       local keys = {}
@@ -78,11 +82,7 @@ dumps = function(x, indent, order)
         elseif type(v) == "table" and vim.tbl_isempty(v) then
           table.insert(out, indent_str .. tostring(k) .. ": []")
         else
-          local item_lines = dumps(v, indent + 2)
-          table.insert(out, indent_str .. tostring(k) .. ":")
-          for _, line in ipairs(item_lines) do
-            table.insert(out, line)
-          end
+          table.insert(out, indent_str .. tostring(k) .. ": " .. dumps(v, 0)[1])
         end
       end
     end

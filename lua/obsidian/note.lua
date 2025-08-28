@@ -839,7 +839,31 @@ Note.from_lines = function(lines, path, opts)
           if metadata == nil then
             metadata = {}
           end
-          metadata[k] = v
+          if k == "references" or k == "source-parents" or k == "author" then
+            local temps = {}
+            if type(v) == "table" then
+              for temp in iter(v) do
+                if type(temp) == "string" then
+                  table.insert(temps, temp)
+                else
+                  log.warn(
+                    "Invalid " .. k .. " value found in frontmatter for "
+                      .. tostring(path)
+                      .. ". Expected string, found "
+                      .. type(temp)
+                      .. "."
+                  )
+                end
+              end
+              metadata[k] = temps
+            elseif type(v) == "string" then
+              metadata[k] = vim.split(v, " ")
+            else
+              log.warn("Funky datatype for " .. k .. ": " .. type(k) .. ".")
+            end
+          else
+            metadata[k] = v
+          end
         end
       end
     end
@@ -909,7 +933,7 @@ Note.frontmatter_lines = function(self, eol, frontmatter)
     iter(yaml.dumps_lines(frontmatter_, function(a, b)
       local a_idx = nil
       local b_idx = nil
-      for i, k in ipairs { "id", "aliases", "tags" } do
+      for i, k in ipairs { "id", "aliases", "type", "author", "source-parents", "references", "tags" } do
         if a == k then
           a_idx = i
         end
