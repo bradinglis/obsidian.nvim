@@ -5,16 +5,15 @@ local abc = require "obsidian.abc"
 local Picker = require "obsidian.pickers.picker"
 
 ---@param entry string
----@return string
+---@return string, integer?, integer?
 local function clean_path(entry)
-  local path_end = assert(string.find(entry, ":", 1, true))
-  return string.sub(entry, 1, path_end - 1)
+  local parts = vim.split(entry, "\0", { plain = true })
+  return parts[1], tonumber(parts[2]), tonumber(parts[3]) - 1
 end
 
 ---@class obsidian.pickers.MiniPicker : obsidian.Picker
 local MiniPicker = abc.new_class({
-  ---@diagnostic disable-next-line: unused-local
-  __tostring = function(self)
+  __tostring = function()
     return "MiniPicker()"
   end,
 }, Picker)
@@ -24,7 +23,7 @@ MiniPicker.find_files = function(self, opts)
   opts = opts or {}
 
   ---@type obsidian.Path
-  local dir = opts.dir and Path:new(opts.dir) or Obsidian.dir
+  local dir = opts.dir and Path.new(opts.dir) or Obsidian.dir
 
   local path = mini_pick.builtin.cli({
     command = self:_build_find_cmd(),
@@ -32,9 +31,9 @@ MiniPicker.find_files = function(self, opts)
     source = {
       name = opts.prompt_title,
       cwd = tostring(dir),
-      choose = function(path)
+      choose = function(chosen_path)
         if not opts.no_default_mappings then
-          mini_pick.default_choose(path)
+          mini_pick.default_choose(chosen_path)
         end
       end,
     },
@@ -46,11 +45,11 @@ MiniPicker.find_files = function(self, opts)
 end
 
 ---@param opts obsidian.PickerGrepOpts|? Options.
-MiniPicker.grep = function(self, opts)
+MiniPicker.grep = function(_, opts)
   opts = opts and opts or {}
 
   ---@type obsidian.Path
-  local dir = opts.dir and Path:new(opts.dir) or Obsidian.dir
+  local dir = opts.dir and Path.new(opts.dir) or Obsidian.dir
 
   local pick_opts = {
     source = {
@@ -73,8 +72,12 @@ MiniPicker.grep = function(self, opts)
   end
 
   if result and opts.callback then
-    local path = clean_path(result)
-    opts.callback(tostring(dir / path))
+    local path, lnum, col = clean_path(result)
+    opts.callback {
+      filename = tostring(dir / path),
+      lnum = lnum,
+      col = col,
+    }
   end
 end
 
@@ -88,12 +91,17 @@ MiniPicker.pick = function(self, values, opts)
 
   local entries = {}
   for _, value in ipairs(values) do
+    local display
     if type(value) == "string" then
-      entries[#entries + 1] = value
-    elseif value.valid ~= false then
+      display = value
+      value = { value = value }
+    else
+      display = opts.format_item and opts.format_item(value) or self:_make_display(value)
+    end
+    if value.valid ~= false then
       entries[#entries + 1] = {
         value = value.value,
-        text = self:_make_display(value),
+        text = display,
         path = value.filename,
         lnum = value.lnum,
         col = value.col,
@@ -110,11 +118,12 @@ MiniPicker.pick = function(self, values, opts)
   }
 
   if entry and opts.callback then
-    if type(entry) == "string" then
-      opts.callback(entry)
-    else
-      opts.callback(entry.value)
-    end
+    opts.callback {
+      filename = entry.path,
+      col = entry.col,
+      lnum = entry.lnum,
+      value = entry.value,
+    }
   end
 end
 

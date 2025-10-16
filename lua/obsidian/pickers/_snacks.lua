@@ -28,8 +28,7 @@ end
 
 ---@class obsidian.pickers.SnacksPicker : obsidian.Picker
 local SnacksPicker = abc.new_class({
-  ---@diagnostic disable-next-line: unused-local
-  __tostring = function(self)
+  __tostring = function()
     return "SnacksPicker()"
   end,
 }, Picker)
@@ -39,7 +38,7 @@ SnacksPicker.find_files = function(self, opts)
   opts = opts or {}
 
   ---@type obsidian.Path
-  local dir = opts.dir.filename and Path:new(opts.dir.filename) or Obsidian.dir
+  local dir = opts.dir.filename and Path.new(opts.dir.filename) or Obsidian.dir
 
   local map = vim.tbl_deep_extend("force", {}, notes_mappings(opts.selection_mappings))
 
@@ -47,6 +46,7 @@ SnacksPicker.find_files = function(self, opts)
   local cmd = table.remove(args, 1)
 
   local pick_opts = vim.tbl_extend("force", map or {}, {
+    pattern = opts.query,
     source = "files",
     title = opts.prompt_title,
     cwd = tostring(dir),
@@ -71,7 +71,7 @@ SnacksPicker.grep = function(self, opts)
   opts = opts or {}
 
   ---@type obsidian.Path
-  local dir = opts.dir.filename and Path:new(opts.dir.filename) or Obsidian.dir
+  local dir = opts.dir.filename and Path.new(opts.dir.filename) or Obsidian.dir
 
   local map = vim.tbl_deep_extend("force", {}, notes_mappings(opts.selection_mappings))
 
@@ -79,6 +79,7 @@ SnacksPicker.grep = function(self, opts)
   local cmd = table.remove(args, 1)
 
   local pick_opts = vim.tbl_extend("force", map or {}, {
+    search = opts.query,
     source = "grep",
     title = opts.prompt_title,
     cwd = tostring(dir),
@@ -88,7 +89,12 @@ SnacksPicker.grep = function(self, opts)
       picker:close()
       if item then
         if opts.callback then
-          opts.callback(item._path or item.filename)
+          opts.callback {
+            filename = item._path or item.filename,
+            col = item.pos and item.pos[2],
+            lnum = item.pos and item.pos[1],
+            value = item.value,
+          }
         else
           snacks_picker.actions.jump(picker, item, action)
         end
@@ -111,21 +117,20 @@ SnacksPicker.pick = function(self, values, opts)
 
   local entries = {}
   for _, value in ipairs(values) do
+    local display
     if type(value) == "string" then
-      table.insert(entries, {
-        text = value,
-        value = value,
-      })
-    elseif type(value) == "table" then
-      local name = self:_make_display(value)
-      table.insert(entries, {
-        text = name,
-        file = value.filename,
-        value = value.value,
-        pos = value.lnum and { value.lnum, value.col or 0 },
-        dir = Path.new(value.filename):is_dir(),
-      })
+      display = value
+      value = { value = value }
+    else
+      display = opts.format_item and opts.format_item(value) or self:_make_display(value)
     end
+    table.insert(entries, {
+      text = display,
+      file = value.filename,
+      value = value.value,
+      pos = value.lnum and { value.lnum, value.col or 0 },
+      dir = value.filename and Path.new(value.filename):is_dir() or false,
+    })
   end
 
   local map = vim.tbl_deep_extend("force", {}, notes_mappings(opts.selection_mappings))
@@ -135,13 +140,25 @@ SnacksPicker.pick = function(self, values, opts)
     items = entries,
     layout = {
       preview = preview,
+      preset = "default",
     },
-    format = preview and "file" or "text",
+    format = "text",
     confirm = function(picker, item, action)
       picker:close()
       if item then
         if opts.callback then
-          opts.callback(item.value)
+          if item.file then
+            opts.callback {
+              filename = item.file,
+              col = item.pos and item.pos[2],
+              lnum = item.pos and item.pos[1],
+              value = item.value,
+            }
+          else
+            opts.callback {
+              value = item.value,
+            }
+          end
         else
           snacks_picker.actions.jump(picker, item, action)
         end

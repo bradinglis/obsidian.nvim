@@ -13,8 +13,8 @@ local function parse_offset(arg)
   end
 end
 
----@param data CommandArgs
-return function(_, data)
+---@param data obsidian.CommandArgs
+return function(data)
   local offset_start = -5
   local offset_end = 0
 
@@ -68,8 +68,8 @@ return function(_, data)
 
   picker:pick(dailies, {
     prompt_title = "Dailies",
-    callback = function(offset)
-      local note = daily.daily(offset, {})
+    callback = function(entry)
+      local note = daily.daily(entry.value, {})
       note:open()
     end,
   })

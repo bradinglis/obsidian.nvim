@@ -1,6 +1,7 @@
 local log = require "obsidian.log"
 local util = require "obsidian.util"
 local api = require "obsidian.api"
+local search = require "obsidian.search"
 
 ---@param tag_locations obsidian.TagLocation[]
 ---@return string[]
@@ -50,15 +51,14 @@ local function gather_tag_picker_list(picker, tag_locations, tags)
     picker:pick(entries, {
       prompt_title = "#" .. table.concat(tags, ", #"),
       callback = function(value)
-        api.open_buffer(value.path, { line = value.line, col = value.col })
+        api.open_buffer(value.filename, { line = value.lnum, col = value.col })
       end,
     })
   end)
 end
 
----@param client obsidian.Client
----@param data CommandArgs
-return function(client, data)
+---@param data obsidian.CommandArgs
+return function(data)
   local picker = Obsidian.picker
   if not picker then
     log.err "No picker configured"
@@ -75,17 +75,21 @@ return function(client, data)
   end
 
   if not vim.tbl_isempty(tags) then
-    client:find_tags_async(tags, function(tag_locations)
+    search.find_tags_async(tags, function(tag_locations)
       return gather_tag_picker_list(picker, tag_locations, util.tbl_unique(tags))
     end)
   else
-    client:find_tags_async("", function(tag_locations)
+    search.find_tags_async("", function(tag_locations)
       tags = list_tags(tag_locations)
       vim.schedule(function()
         picker:pick(tags, {
           callback = function(...)
-            gather_tag_picker_list(picker, tag_locations, { ... })
+            tags = vim.tbl_map(function(v)
+              return v.value
+            end, { ... })
+            gather_tag_picker_list(picker, tag_locations, tags)
           end,
+          selection_mappings = picker:_tag_selection_mappings(),
           allow_multiple = true,
         })
       end)

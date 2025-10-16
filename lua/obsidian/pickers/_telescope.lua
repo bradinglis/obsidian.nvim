@@ -9,8 +9,7 @@ local log = require "obsidian.log"
 
 ---@class obsidian.pickers.TelescopePicker : obsidian.Picker
 local TelescopePicker = abc.new_class({
-  ---@diagnostic disable-next-line: unused-local
-  __tostring = function(self)
+  __tostring = function()
     return "TelescopePicker()"
   end,
 }, Picker)
@@ -31,6 +30,16 @@ end
 ---@param allow_multiple boolean|?
 ---@return table[]|?
 local function get_selected(prompt_bufnr, keep_open, allow_multiple)
+  ---@return obsidian.PickerEntry
+  local function selection_to_entry(selection)
+    return {
+      filename = selection.path or selection.filename or selection.value.path,
+      lnum = selection.lnum,
+      col = selection.col,
+      value = selection.value,
+    }
+  end
+
   local picker = actions_state.get_current_picker(prompt_bufnr)
   local entries = picker:get_multi_selection()
   if entries and #entries > 0 then
@@ -43,12 +52,12 @@ local function get_selected(prompt_bufnr, keep_open, allow_multiple)
       telescope_actions.close(prompt_bufnr)
     end
 
-    return entries
+    return vim.tbl_map(selection_to_entry, entries)
   else
     local entry = get_entry(prompt_bufnr, keep_open)
 
     if entry then
-      return { entry }
+      return vim.tbl_map(selection_to_entry, { entry })
     end
   end
 end
@@ -72,18 +81,10 @@ local function get_query(prompt_bufnr, keep_open, initial_query)
   end
 end
 
----@param opts { entry_key: string|?, callback: fun(path: string)|?, allow_multiple: boolean|?, query_mappings: obsidian.PickerMappingTable|?, selection_mappings: obsidian.PickerMappingTable|?, initial_query: string|? }
+---@param opts { callback: fun(entry: obsidian.PickerEntry)|?, allow_multiple: boolean|?, query_mappings: obsidian.PickerMappingTable|?, selection_mappings: obsidian.PickerMappingTable|?, initial_query: string|? }
 local function attach_picker_mappings(map, opts)
   -- Docs for telescope actions:
   -- https://github.com/nvim-telescope/telescope.nvim/blob/master/lua/telescope/actions/init.lua
-
-  local function entry_to_value(entry)
-    if opts.entry_key then
-      return entry[opts.entry_key]
-    else
-      return entry
-    end
-  end
 
   if opts.query_mappings then
     for key, mapping in pairs(opts.query_mappings) do
@@ -101,8 +102,7 @@ local function attach_picker_mappings(map, opts)
       map({ "i", "n" }, key, function(prompt_bufnr)
         local entries = get_selected(prompt_bufnr, mapping.keep_open, mapping.allow_multiple)
         if entries then
-          local values = vim.tbl_map(entry_to_value, entries)
-          mapping.callback(unpack(values))
+          mapping.callback(unpack(entries))
         elseif mapping.fallback_to_query then
           local query = get_query(prompt_bufnr, mapping.keep_open)
           if query then
@@ -117,8 +117,8 @@ local function attach_picker_mappings(map, opts)
     map({ "i", "n" }, "<CR>", function(prompt_bufnr)
       local entries = get_selected(prompt_bufnr, false, opts.allow_multiple)
       if entries then
-        local values = vim.tbl_map(entry_to_value, entries)
-        opts.callback(unpack(values))
+        ---@diagnostic disable-next-line: param-type-mismatch
+        opts.callback(unpack(entries))
       end
     end)
   end
@@ -135,13 +135,17 @@ TelescopePicker.find_files = function(self, opts)
   }
 
   telescope.find_files {
+    default_text = opts.query,
     prompt_title = prompt_title,
     cwd = opts.dir and tostring(opts.dir) or tostring(Obsidian.dir),
     find_command = self:_build_find_cmd(),
     attach_mappings = function(_, map)
       attach_picker_mappings(map, {
-        entry_key = "path",
-        callback = opts.callback,
+        callback = function(entry)
+          if opts.callback then
+            opts.callback(entry.filename)
+          end
+        end,
         query_mappings = opts.query_mappings,
         selection_mappings = opts.selection_mappings,
       })
@@ -154,7 +158,7 @@ end
 TelescopePicker.grep = function(self, opts)
   opts = opts or {}
 
-  local cwd = opts.dir and Path:new(opts.dir) or Obsidian.dir
+  local cwd = opts.dir and Path.new(opts.dir) or Obsidian.dir
 
   local prompt_title = self:_build_prompt {
     prompt_title = opts.prompt_title,
@@ -164,7 +168,6 @@ TelescopePicker.grep = function(self, opts)
 
   local attach_mappings = function(_, map)
     attach_picker_mappings(map, {
-      entry_key = "path",
       callback = opts.callback,
       query_mappings = opts.query_mappings,
       selection_mappings = opts.selection_mappings,
@@ -206,7 +209,6 @@ TelescopePicker.pick = function(self, values, opts)
   local picker_opts = {
     attach_mappings = function(_, map)
       attach_picker_mappings(map, {
-        entry_key = "value",
         callback = opts.callback,
         allow_multiple = opts.allow_multiple,
         query_mappings = opts.query_mappings,
@@ -217,7 +219,7 @@ TelescopePicker.pick = function(self, values, opts)
   }
 
   local displayer = function(entry)
-    return self:_make_display(entry.raw)
+    return opts.format_item and opts.format_item(entry.raw) or self:_make_display(entry.raw)
   end
 
   local prompt_title = self:_build_prompt {
