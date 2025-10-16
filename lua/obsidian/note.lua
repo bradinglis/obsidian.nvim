@@ -685,101 +685,9 @@ Note.from_lines = function(lines, path, opts)
   -- Parse the frontmatter YAML.
   local metadata = {}
   if #frontmatter_lines > 0 then
-    local frontmatter = table.concat(frontmatter_lines, "\n")
-    local ok, data = pcall(yaml.loads, frontmatter)
-    if type(data) ~= "table" then
-      data = {}
-    end
-    if ok then
-      ---@diagnostic disable-next-line: param-type-mismatch
-      for k, v in pairs(data) do
-        if k == "id" then
-          if type(v) == "string" or type(v) == "number" then
-            id = v
-          else
-            log.warn("Invalid 'id' in frontmatter for " .. tostring(path))
-          end
-        elseif k == "title" then
-          if type(v) == "string" then
-            title = v
-            if metadata == nil then
-              metadata = {}
-            end
-            metadata.title = v
-          else
-            log.warn("Invalid 'title' in frontmatter for " .. tostring(path))
-          end
-        elseif k == "aliases" then
-          if type(v) == "table" then
-            for alias in iter(v) do
-              if type(alias) == "string" then
-                table.insert(aliases, alias)
-              else
-                log.warn(
-                  "Invalid alias value found in frontmatter for "
-                    .. tostring(path)
-                    .. ". Expected string, found "
-                    .. type(alias)
-                    .. "."
-                )
-              end
-            end
-          elseif type(v) == "string" then
-            table.insert(aliases, v)
-          else
-            log.warn("Invalid 'aliases' in frontmatter for " .. tostring(path))
-          end
-        elseif k == "tags" then
-          if type(v) == "table" then
-            for tag in iter(v) do
-              if type(tag) == "string" then
-                table.insert(tags, tag)
-              else
-                log.warn(
-                  "Invalid tag value found in frontmatter for "
-                    .. tostring(path)
-                    .. ". Expected string, found "
-                    .. type(tag)
-                    .. "."
-                )
-              end
-            end
-          elseif type(v) == "string" then
-            tags = vim.split(v, " ")
-          else
-            log.warn("Invalid 'tags' in frontmatter for '%s'", path)
-          end
-        else
-          if metadata == nil then
-            metadata = {}
-          end
-          if k == "references" or k == "source-parents" or k == "author" then
-            local temps = {}
-            if type(v) == "table" then
-              for temp in iter(v) do
-                if type(temp) == "string" then
-                  table.insert(temps, temp)
-                else
-                  log.warn(
-                    "Invalid " .. k .. " value found in frontmatter for "
-                      .. tostring(path)
-                      .. ". Expected string, found "
-                      .. type(temp)
-                      .. "."
-                  )
-                end
-              end
-              metadata[k] = temps
-            elseif type(v) == "string" then
-              metadata[k] = vim.split(v, " ")
-            else
-              log.warn("Funky datatype for " .. k .. ": " .. type(k) .. ".")
-            end
-          else
-            metadata[k] = v
-          end
-        end
-      end
+    info, metadata = Frontmatter.parse(frontmatter_lines, path)
+    if metadata and metadata.title and type(metadata.title) == "string" then
+      title = metadata.title
     end
   end
 
@@ -827,55 +735,7 @@ Note.frontmatter = require("obsidian.builtin").frontmatter
 ---
 ---@param current_lines string[]
 ---@return string[]
-<<<<<<< HEAD
 Note.frontmatter_lines = function(self, eol, frontmatter)
-  local new_lines = { "---" }
-
-  local frontmatter_ = frontmatter and frontmatter or self:frontmatter()
-  if vim.tbl_isempty(frontmatter_) then
-    return {}
-  end
-
-  for line in
-    iter(yaml.dumps_lines(frontmatter_, function(a, b)
-      local a_idx = nil
-      local b_idx = nil
-      for i, k in ipairs { "id", "aliases", "type", "author", "source-parents", "references", "tags" } do
-        if a == k then
-          a_idx = i
-        end
-        if b == k then
-          b_idx = i
-        end
-      end
-      if a_idx ~= nil and b_idx ~= nil then
-        return a_idx < b_idx
-      elseif a_idx ~= nil then
-        return true
-      elseif b_idx ~= nil then
-        return false
-      else
-        return a < b
-      end
-    end))
-  do
-    table.insert(new_lines, line)
-  end
-
-  table.insert(new_lines, "---")
-  if not self.has_frontmatter then
-    -- Make sure there's an empty line between end of the frontmatter and the contents.
-    table.insert(new_lines, "")
-  end
-
-  if eol then
-    return vim.tbl_map(function(l)
-      return l .. "\n"
-    end, new_lines)
-  else
-    return new_lines
-=======
-Note.frontmatter_lines = function(self, current_lines)
   local order
   if Obsidian.opts.frontmatter.sort then
     order = Obsidian.opts.frontmatter.sort
@@ -884,8 +744,8 @@ Note.frontmatter_lines = function(self, current_lines)
       return not Note._is_frontmatter_boundary(line)
     end, current_lines)
     _, _, order = pcall(yaml.loads, table.concat(current_lines, "\n"))
->>>>>>> upstream/main
   end
+
   ---@diagnostic disable-next-line: param-type-mismatch
   return Frontmatter.dump(Obsidian.opts.frontmatter.func(self), order)
 end

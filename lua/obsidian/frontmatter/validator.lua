@@ -57,7 +57,7 @@ validator.tags = function(v, path)
       end
     end
   elseif type(v) == "string" then
-    table.insert(tags, v)
+    table.insert(tags, vim.split(v, " "))
   else
     return nil, string.format("Invalid tags in frontmatter for '%s'", path)
   end

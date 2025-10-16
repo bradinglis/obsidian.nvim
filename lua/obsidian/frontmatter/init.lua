@@ -75,10 +75,32 @@ M.parse = function(frontmatter_lines, path)
         ret[k] = value
       end
     else
-      metadata[k] = v
+      if k == "references" or k == "source-parents" or k == "author" then
+        if type(v) == "table" then
+          metadata[k] = {}
+          for temp in vim.iter(v) do
+            if type(temp) == "string" then
+              table.insert(metadata[k], temp)
+            else
+              log.warn(
+                "Invalid " .. k .. " value found in frontmatter for "
+                  .. tostring(path)
+                  .. ". Expected string, found "
+                  .. type(temp)
+                  .. "."
+              )
+            end
+          end
+        elseif type(v) == "string" then
+          metadata[k] = vim.split(v, " ")
+        else
+          log.warn("Funky datatype for " .. k .. ": " .. type(k) .. ".")
+        end
+      else
+        metadata[k] = v
+      end
     end
   end
-
   return ret, metadata
 end
 
