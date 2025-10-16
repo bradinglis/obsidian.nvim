@@ -46,7 +46,7 @@ return {
   frontmatter = {
     enabled = true,
     func = require("obsidian.builtin").frontmatter,
-    sort = { "id", "aliases", "tags" },
+    sort = { "id", "aliases", "type", "author", "source-parents", "references", "tags" },
   },
 
   ---@class obsidian.config.TemplateOpts

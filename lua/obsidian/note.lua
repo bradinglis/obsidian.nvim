@@ -735,7 +735,7 @@ Note.frontmatter = require("obsidian.builtin").frontmatter
 ---
 ---@param current_lines string[]
 ---@return string[]
-Note.frontmatter_lines = function(self, eol, frontmatter)
+Note.frontmatter_lines = function(self, current_lines)
   local order
   if Obsidian.opts.frontmatter.sort then
     order = Obsidian.opts.frontmatter.sort
@@ -745,7 +745,6 @@ Note.frontmatter_lines = function(self, eol, frontmatter)
     end, current_lines)
     _, _, order = pcall(yaml.loads, table.concat(current_lines, "\n"))
   end
-
   ---@diagnostic disable-next-line: param-type-mismatch
   return Frontmatter.dump(Obsidian.opts.frontmatter.func(self), order)
 end
