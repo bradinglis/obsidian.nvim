@@ -35,13 +35,13 @@ M.Patterns = {
   Highlight = "==[^=]+==", -- ==text==
 
   -- References
-  WikiWithAlias = "%[%[[^][%|]+%|[^%]]+%]%]", -- [[xxx|yyy]]
-  Wiki = "%[%[[^][%|]+%]%]", -- [[xxx]]
-  Markdown = "%[[^][]+%]%([^%)]+%)", -- [yyy](xxx)
+  WikiWithAlias = "%[%[[^][%|]+%|[^%]]+%]%]",                                  -- [[xxx|yyy]]
+  Wiki = "%[%[[^][%|]+%]%]",                                                   -- [[xxx]]
+  Markdown = "%[[^][]+%]%([^%)]+%)",                                           -- [yyy](xxx)
   NakedUrl = "https?://[a-zA-Z0-9._-@]+[a-zA-Z0-9._#/=&?:+%%-@]+[a-zA-Z0-9/]", -- https://xyz.com
-  FileUrl = "file:/[/{2}]?.*", -- file:///
-  MailtoUrl = "mailto:.*", -- mailto:emailaddress
-  BlockID = util.BLOCK_PATTERN .. "$", -- ^hello-world
+  FileUrl = "file:/[/{2}]?.*",                                                 -- file:///
+  MailtoUrl = "mailto:.*",                                                     -- mailto:emailaddress
+  BlockID = util.BLOCK_PATTERN .. "$",                                         -- ^hello-world
 }
 
 ---@type table<obsidian.search.RefTypes, { ignore_if_escape_prefix: boolean|? }>
@@ -93,9 +93,9 @@ M.find_matches = function(s, pattern_names)
           -- Check if we should skip to an escape sequence before the pattern.
           local skip_due_to_escape = false
           if
-            pattern_cfg ~= nil
-            and pattern_cfg.ignore_if_escape_prefix
-            and string.sub(s, m_start - 1, m_start - 1) == [[\]]
+              pattern_cfg ~= nil
+              and pattern_cfg.ignore_if_escape_prefix
+              and string.sub(s, m_start - 1, m_start - 1) == [[\]]
           then
             skip_due_to_escape = true
           end
@@ -492,6 +492,21 @@ M.search_async = function(dir, term, opts, on_match, on_exit)
   end)
 end
 
+--- Search markdown files in a directory for a given term. Each match is passed to the `on_match` callback.
+---
+---@param dir string|obsidian.Path
+---@param on_match fun(match: MatchData)
+---@param on_exit fun(exit_code: integer)|?
+M.get_all_async = function(dir, on_match, on_exit)
+  local path = tostring(Path.new(dir):resolve { strict = true })
+
+  async.run_job_async({ "rg", path, "--sortr=modified", "--no-config", "--files", "--type=md" }, on_match, function(code)
+    if on_exit ~= nil then
+      on_exit(code)
+    end
+  end)
+end
+
 --- Find markdown files in a directory matching a given term. Each matching path is passed to the `on_match` callback.
 ---
 ---@param dir string|obsidian.Path
@@ -595,6 +610,42 @@ local _search_async = function(term, search_opts, find_opts, callback, exit_call
   -- M.find_async(Obsidian.dir, term, _prepare_search_opts(find_opts, { ignore_case = true }), on_find_match, on_exit)
 end
 
+---@param callback fun(path: obsidian.Path)
+---@param exit_callback fun(paths: obsidian.Path[])
+local _get_all_async = function(callback, exit_callback)
+  local found = {}
+  local result = {}
+
+  local function dedup_send(path)
+    local key = tostring(path:resolve { strict = true })
+    if not found[key] then
+      found[key] = true
+      result[#result + 1] = path
+      callback(path)
+    end
+  end
+
+  local function on_find_match(path_match)
+    local path = Path.new(path_match)
+    dedup_send(path)
+  end
+
+  local function on_exit()
+    -- cmds_done = cmds_done + 1
+    -- if cmds_done == 2 then
+    exit_callback(result)
+    -- end
+  end
+
+  M.get_all_async(
+    Obsidian.dir,
+    on_find_match,
+    on_exit
+  )
+
+  -- M.find_async(Obsidian.dir, term, _prepare_search_opts(find_opts, { ignore_case = true }), on_find_match, on_exit)
+end
+
 --- An async version of `find_notes()` using coroutines.
 ---
 ---@param term string The term to search for
@@ -665,11 +716,91 @@ M.find_notes_async = function(term, callback, opts)
   end)
 end
 
+--- An async version of `find_notes()` using coroutines.
+---
+---@param term string The term to search for
+---@param callback fun(notes: table<string, obsidian.Note>)
+---@param opts { search: obsidian.SearchOpts|?, notes: obsidian.note.LoadOpts|? }|?
+M.get_all_notes_async = function(callback, opts)
+  async.run(function()
+    opts = opts or {}
+    opts.notes = opts.notes or {}
+    if not opts.notes.max_lines then
+      opts.notes.max_lines = Obsidian.opts.search_max_lines
+    end
+
+    local Note = require "obsidian.note"
+
+    ---@type table<string, integer>
+    local paths = {}
+    local err_count = 0
+    local first_err, first_err_path
+    local notes = {}
+
+    -- Awaitable wrapper for loading a single note from path
+    ---@param path string
+    local function load_note_async(path)
+      local ok, res = pcall(Note.from_file, path, opts.notes)
+      if ok then
+        res.recency = paths[tostring(res.path)]
+        notes[res.id] = res
+      else
+        err_count = err_count + 1
+        if not first_err then
+          first_err = res
+          first_err_path = path
+        end
+      end
+    end
+
+    local paths_found = {} ---@type string[]
+    async.await(2, _get_all_async, function(path)
+      paths[tostring(path)] = #paths_found + 1
+      paths_found[#paths_found + 1] = path
+    end)
+
+    async.join(
+      10,
+      vim.tbl_map(function(path)
+        return function()
+          load_note_async(path)
+        end
+      end, paths_found)
+    )
+
+    -- Sort notes by search order
+    -- table.sort(notes, function(a, b)
+    --   return paths[tostring(a.path)] < paths[tostring(b.path)]
+    -- end)
+
+    -- Report any errors
+    if first_err and first_err_path then
+      log.err(
+        "%d error(s) occurred during search. First error from note at '%s':\n%s",
+        err_count,
+        first_err_path,
+        first_err
+      )
+    end
+
+    callback(notes)
+  end)
+end
+
 M.find_notes = function(term, opts)
   opts = opts or {}
   opts.timeout = opts.timeout or 1000
   return async.block_on(function(cb)
     return M.find_notes_async(term, cb, { search = opts.search })
+  end, opts.timeout)
+end
+
+---@return table<string, obsidian.Note>
+M.get_notes = function(opts)
+  opts = opts or {}
+  opts.timeout = opts.timeout or 1000
+  return async.block_on(function(cb)
+    return M.get_all_notes_async(cb, { notes = opts.notes, search = opts.search })
   end, opts.timeout)
 end
 
@@ -1132,10 +1263,10 @@ M.find_tags_async = function(term, callback, opts)
       search_terms[#search_terms + 1] = "#" .. M.Patterns.TagCharsOptional .. t .. M.Patterns.TagCharsOptional
       -- frontmatter tag in multiline list
       search_terms[#search_terms + 1] = "\\s*- "
-        .. M.Patterns.TagCharsOptional
-        .. t
-        .. M.Patterns.TagCharsOptional
-        .. "$"
+          .. M.Patterns.TagCharsOptional
+          .. t
+          .. M.Patterns.TagCharsOptional
+          .. "$"
       -- frontmatter tag in inline list
       search_terms[#search_terms + 1] = "tags: .*" .. M.Patterns.TagCharsOptional .. t .. M.Patterns.TagCharsOptional
     else

@@ -26,6 +26,11 @@ local DEFAULT_MAX_LINES = 500
 
 local CODE_BLOCK_PATTERN = "^%s*```[%w_-]*$"
 
+--- body_tag type
+---@class body_tag
+---@field tag string
+---@field line integer
+
 ---A class that represents a note within a vault.
 ---
 ---@toc_entry obsidian.Note
@@ -36,7 +41,12 @@ local CODE_BLOCK_PATTERN = "^%s*```[%w_-]*$"
 ---@field aliases string[]
 ---@field title string|?
 ---@field tags string[]
+---@field body_tags body_tag[]
+---@field recency integer|?
+---@field links string[]
+---@field icon string|?
 ---@field path obsidian.Path|?
+---@field relative_path string|?
 ---@field metadata table
 ---@field has_frontmatter boolean|?
 ---@field frontmatter_end_line integer|?
@@ -224,14 +234,14 @@ Note._resolve_title_id_path = function(title, id, dir, strategy)
   else
     local bufpath = Path.buffer(0):resolve()
     if
-      strategy.new_notes_location == config.NewNotesLocation.current_dir
-      -- note is actually in the workspace.
-      and Obsidian.dir:is_parent_of(bufpath)
-      -- note is not in dailies folder
-      and (
-        Obsidian.opts.daily_notes.folder == nil
-        or not (Obsidian.dir / Obsidian.opts.daily_notes.folder):is_parent_of(bufpath)
-      )
+        strategy.new_notes_location == config.NewNotesLocation.current_dir
+        -- note is actually in the workspace.
+        and Obsidian.dir:is_parent_of(bufpath)
+        -- note is not in dailies folder
+        and (
+          Obsidian.opts.daily_notes.folder == nil
+          or not (Obsidian.dir / Obsidian.opts.daily_notes.folder):is_parent_of(bufpath)
+        )
     then
       base_dir = Obsidian.buf_dir or assert(bufpath:parent())
     else
@@ -264,7 +274,7 @@ end
 --- @return obsidian.Note
 Note.create = function(opts)
   local new_title, new_id, path =
-    Note._resolve_title_id_path(opts.title, opts.id, opts.dir, Note._get_creation_opts(opts))
+      Note._resolve_title_id_path(opts.title, opts.id, opts.dir, Note._get_creation_opts(opts))
   opts = vim.tbl_extend("keep", opts, { aliases = {}, tags = {} })
 
   -- Add the title as an alias.
@@ -562,6 +572,11 @@ Note.from_lines = function(lines, path, opts)
     blocks = {}
   end
 
+  local links = {}
+  local body_tags = {}
+  local references = {}
+  local r_links = {}
+
   ---@param anchor_data obsidian.note.HeaderAnchor
   ---@return obsidian.note.HeaderAnchor|?
   local function get_parent_anchor(anchor_data)
@@ -664,6 +679,24 @@ Note.from_lines = function(lines, path, opts)
           blocks[block] = { id = block, line = line_idx, block = line }
         end
       end
+
+      for link in line:gmatch("%[%[[%w-_.',]*[|%]]") do
+        table.insert(links, { link:sub(3, -2), line_idx })
+      end
+
+      for tag in line:gmatch("#[%w-]+") do
+        tag = tag:sub(2, -1)
+        table.insert(body_tags, { tag = tag, line = line_idx })
+      end
+
+      local id, reference = line:match("^%[([0-9]+)%]: (.+)")
+      if id ~= nil then
+        references[id] = reference
+      else
+        for _, r in line:gmatch("%[([^%]]+)%]%[(%d+)%]") do
+          table.insert(r_links, { r, line_idx })
+        end
+      end
     end
 
     -- Collect contents.
@@ -671,13 +704,17 @@ Note.from_lines = function(lines, path, opts)
       table.insert(contents, line)
     end
 
-    -- Check if we can stop reading lines now.
+    -- Always read all lines
     if
-      line_idx > max_lines
-      or (title and not opts.load_contents and not opts.collect_anchor_links and not opts.collect_blocks)
+        line_idx > max_lines
+        or (false)
     then
       break
     end
+  end
+
+  for _, value in ipairs(r_links) do
+    table.insert(links, { references[value[1]], value[2] })
   end
 
   local info = {}
@@ -712,6 +749,22 @@ Note.from_lines = function(lines, path, opts)
   n.contents = contents
   n.anchor_links = anchor_links
   n.blocks = blocks
+  n.links = links
+  n.body_tags = body_tags
+
+  local type = n.metadata.type or ""
+  local icon = ""
+  if type == "author" then
+    icon = ""
+  elseif type == "note" then
+    icon = ""
+  elseif type == "source" then
+    icon = ""
+  end
+
+  n.icon = icon
+  n.relative_path = Path.vault_relative_path(path)
+
   return n
 end
 
